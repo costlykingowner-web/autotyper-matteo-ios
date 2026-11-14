@@ -1,0 +1,34 @@
+name: Build iOS IPA
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack project
+        run: unzip -q CosTLY-Autotyper-iOS.zip -d work
+      - name: Install tools
+        run: brew install xcodegen ldid
+      - name: Generate Xcode project
+        working-directory: work/CosTLYAutotyper-iOS
+        run: xcodegen generate
+      - name: Build (unsigned)
+        working-directory: work/CosTLYAutotyper-iOS
+        run: |
+          xcodebuild -project CosTLYAutotyper.xcodeproj -scheme CosTLYAutotyper \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Package IPA
+        working-directory: work/CosTLYAutotyper-iOS
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/CosTLYAutotyper.app Payload/
+          ldid -SApp/App.entitlements Payload/CosTLYAutotyper.app/CosTLYAutotyper
+          ldid -SKeyboard/Keyboard.entitlements Payload/CosTLYAutotyper.app/PlugIns/AutotyperKeyboard.appex/AutotyperKeyboard
+          zip -qr CosTLYAutotyper.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CosTLYAutotyper-ipa
+          path: work/CosTLYAutotyper-iOS/CosTLYAutotyper.ipa
